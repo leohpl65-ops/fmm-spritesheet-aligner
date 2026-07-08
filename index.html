@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FNF XML & Spritesheet Viewer & Exporter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #22252a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        h1 { color: #00ff99; margin-bottom: 20px; }
+        
+        .download-trigger-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #00ff99;
+            color: #111;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+        .download-trigger-btn:hover { background: #00cc7a; }
+        .download-trigger-btn:disabled { background: #555; color: #aaa; cursor: not-allowed; }
+
+        .controls {
+            background: #2e3238;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .control-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input, select {
+            background: #40444b;
+            border: 1px solid #555;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .viewer-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .canvas-box {
+            background: #1e1e1e;
+            border: 2px dashed #00ff99;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex: 2;
+            min-height: 400px;
+        }
+        canvas { background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%); background-size: 20px 20px; }
+        .info-box {
+            background: #2e3238;
+            padding: 15px;
+            border-radius: 8px;
+            flex: 1;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        ul { list-style: none; padding: 0; }
+        li { padding: 6px; border-bottom: 1px solid #444; font-size: 14px; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal {
+            background: #2e3238;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+        }
+        .modal h2 { color: #00ff99; margin-top: 0; }
+        .modal p { color: #ccc; font-size: 14px; margin-bottom: 25px; }
+        .modal-buttons { display: flex; flex-direction: column; gap: 12px; }
+        .modal-btn {
+            padding: 12px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #00ff99; color: #111; }
+        .btn-primary:hover { background: #00cc7a; }
+        .btn-secondary { background: #4f545c; color: white; }
+        .btn-secondary:hover { background: #686d73; }
+        .btn-close { background: transparent; color: #aaa; margin-top: 10px; text-decoration: underline; font-size: 12px; border:none; cursor:pointer;}
+        .btn-close:hover { color: #fff; }
+    </style>
+</head>
+<body>
+
+    <h1>FNF Spritesheet Player</h1>
+
+    <button class="download-trigger-btn" id="downloadTrigger" disabled>Descargar</button>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>1. Imagen (.png)</label>
+            <input type="file" id="imageInput" accept="image/png">
+        </div>
+        <div class="control-group">
+            <label>2. Archivo (.xml)</label>
+            <input type="file" id="xmlInput" accept=".xml">
+        </div>
+        <div class="control-group">
+            <label>Animación</label>
+            <select id="animSelect" disabled>
+                <option>Sube los archivos primero</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>FPS</label>
+            <input type="number" id="fpsInput" value="24" min="1" max="60" style="width: 60px;">
+        </div>
+    </div>
+
+    <div class="viewer-container">
+        <div class="canvas-box">
+            <canvas id="canvas" width="400" height="400"></canvas>
+        </div>
+        <div class="info-box">
+            <h3>Datos del Frame</h3>
+            <ul id="frameInfo">
+                <li>Sube archivos para ver la información.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2>Opciones de Descarga</h2>
+            <p>Selecciona cómo deseas exportar los frames procesados de la animación.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-primary" id="btnDownloadCurrent">Descargar esta animación (.zip)</button>
+                <button class="modal-btn btn-secondary" id="btnDownloadAll">Descargar todas en un .zip</button>
+                <button class="modal-btn btn-close" id="btnCloseModal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const xmlInput = document.getElementById('xmlInput');
+        const animSelect = document.getElementById('animSelect');
+        const fpsInput = document.getElementById('fpsInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        const hCtx = hiddenCanvas.getContext('2d');
+        const frameInfo = document.getElementById('frameInfo');
+
+        const downloadTrigger = document.getElementById('downloadTrigger');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const btnDownloadCurrent = document.getElementById('btnDownloadCurrent');
+        const btnDownloadAll = document.getElementById('btnDownloadAll');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+
+        let spritesheet = new Image();
+        let animations = {}; 
+        let currentAnimName = '';
+        let currentFrameIndex = 0;
+        let lastFrameTime = 0;
+        
+        // Banderas para verificar que ambos elementos estén listos
+        let isImgLoaded = false;
+        let isXmlLoaded = false;
+
+        // 1. Cargar Imagen
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    spritesheet.onload = () => {
+                        isImgLoaded = true;
+                        checkAndStart();
+                    };
+                    spritesheet.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // 2. Cargar XML
+        xmlInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseXML(event.target.result);
+                    isXmlLoaded = true;
+                    checkAndStart();
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function parseXML(xmlText) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const subTextures = xmlDoc.getElementsByTagName('SubTexture');
+            
+            animations = {}; 
+
+            if(subTextures.length === 0) {
+                alert("El XML no parece tener un formato Sparrow válido de FNF.");
+                return;
+            }
+
+            for (let i = 0; i < subTextures.length; i++) {
+                const texture = subTextures[i];
+                const rawName = texture.getAttribute('name');
+                if(!rawName) continue;
+                
+                const animName = rawName.replace(/\d+$/, '').trim();
+
+                const frameData = {
+                    x: parseInt(texture.getAttribute('x')),
+                    y: parseInt(texture.getAttribute('y')),
+                    width: parseInt(texture.getAttribute('width')),
+                    height: parseInt(texture.getAttribute('height')),
+                    frameX: parseInt(texture.getAttribute('frameX') || 0),
+                    frameY: parseInt(texture.getAttribute('frameY') || 0),
+                    frameWidth: parseInt(texture.getAttribute('frameWidth') || texture.getAttribute('width')),
+                    frameHeight: parseInt(texture.getAttribute('frameHeight') || texture.getAttribute('height'))
+                };
+
+                if (!animations[animName]) animations[animName] = [];
+                animations[animName].push(frameData);
+            }
+
+            animSelect.innerHTML = '';
+            Object.keys(animations).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                animSelect.appendChild(option);
+            });
+            
+            if(Object.keys(animations).length > 0) {
+                animSelect.disabled = false;
+                currentAnimName = animSelect.value;
+            }
+        }
+
+        // Variable global para evitar que se dupliquen los bucles de animación (loops)
+        let animationId = null;
+
+        function checkAndStart() {
+            // Solo arranca si ambos archivos terminaron de procesarse completamente
+            if (isImgLoaded && isXmlLoaded && currentAnimName) {
+                currentFrameIndex = 0;
+                lastFrameTime = performance.now();
+                downloadTrigger.disabled = false;
+                
+                // Si ya había un bucle corriendo, lo cancelamos para que no parpadee
+                if (animationId) cancelAnimationFrame(animationId);
+                animationId = requestAnimationFrame(updateAnimation);
+            }
+        }
+
+        animSelect.addEventListener('change', (e) => {
+            currentAnimName = e.target.value;
+            currentFrameIndex = 0;
+        });
+
+        function updateAnimation(timestamp) {
+            if (!currentAnimName || !animations[currentAnimName]) return;
+
+            const fps = parseInt(fpsInput.value) || 24;
+            const interval = 1000 / fps;
+            const elapsed = timestamp - lastFrameTime;
+
+            if (elapsed > interval) {
+                currentFrameIndex = (currentFrameIndex + 1) % animations[currentAnimName].length;
+                lastFrameTime = timestamp - (elapsed % interval);
+                drawFrame();
+            }
+            animationId = requestAnimationFrame(updateAnimation);
+        }
+
+        function drawFrame() {
+            const frame = animations[currentAnimName][currentFrameIndex];
+            if (!frame) return;
+
+            canvas.width = frame.frameWidth;
+            canvas.height = frame.frameHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const posX = Math.abs(frame.frameX);
+            const posY = Math.abs(frame.frameY);
+
+            ctx.drawImage(spritesheet, frame.x, frame.y, frame.width, frame.height, posX, posY, frame.width, frame.height);
+
+            frameInfo.innerHTML = `
+                <li><strong>Animación:</strong> ${currentAnimName}</li>
+                <li><strong>Frame:</strong> ${currentFrameIndex + 1} / ${animations[currentAnimName].length}</li>
+                <li><strong>Medidas:</strong> ${frame.width}x${frame.height}</li>
+                <li><strong>Offsets:</strong> ${frame.frameX}, ${frame.frameY}</li>
+            `;
+        }
+
+        // --- VENTANA EMERGENTE Y ZIP ---
+        downloadTrigger.addEventListener('click', () => modalOverlay.classList.add('active'));
+        btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('active'));
+        modalOverlay.addEventListener('click', (e) => { if(e.target === modalOverlay) modalOverlay.classList.remove('active'); });
+
+        function generateFrameBase64(animName, index) {
+            const frame = animations[animName][index];
+            hiddenCanvas.width = frame.frameWidth;
+            hiddenCanvas.height = frame.frameHeight;
+            hCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+            const posX = Math.abs(frame.frameX);
+            const posY = Math.abs(frame.frameY);
+
+            hCtx.drawImage(spritesheet, frame.x, frame.y, frame.width, frame.height, posX, posY, frame.width, frame.height);
+            return hiddenCanvas.toDataURL('image/png').split(',')[1];
+        }
+
+        btnDownloadCurrent.addEventListener('click', async () => {
+            if (!currentAnimName) return;
+            btnDownloadCurrent.textContent = "Procesando...";
+            
+            const zip = new JSZip();
+            const frames = animations[currentAnimName];
+
+            for (let i = 0; i < frames.length; i++) {
+                const base64Data = generateFrameBase64(currentAnimName, i);
+                const fileName = `${currentAnimName}_${String(i).padStart(3, '0')}.png`;
+                zip.file(fileName, base64Data, {base64: true});
+            }
+
+            const content = await zip.generateAsync({type: "blob"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `${currentAnimName}_export.zip`;
+            link.click();
+
+            btnDownloadCurrent.textContent = "Descargar esta animación (.zip)";
+            modalOverlay.classList.remove('active');
+        });
+
+        btnDownloadAll.addEventListener('click', async () => {
+            if (Object.keys(animations).length === 0) return;
+            btnDownloadAll.textContent = "Procesando Todo...";
+
+            const zip = new JSZip();
+
+            for (const animName in animations) {
+                const folder = zip.folder(animName);
+                const frames = animations[animName];
+
+                for (let i = 0; i < frames.length; i++) {
+                    const base64Data = generateFrameBase64(animName, i);
+                    const fileName = `${animName}_${String(i).padStart(3, '0')}.png`;
+                    folder.file(fileName, base64Data, {base64: true});
+                }
+            }
+
+            const content = await zip.generateAsync({type: "blob"});
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `fnf_spritesheet_completo.zip`;
+            link.click();
+
+            btnDownloadAll.textContent = "Descargar todas en un .zip";
+            modalOverlay.classList.remove('active');
+        });
+    </script>
+</body>
+</html>
