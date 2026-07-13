@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FNF to Funky Maker Mobile Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #22252a;
+            color: #fff;
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
+        h1 { color: #00ff99; margin: 10px 0 5px 0; font-size: 24px; }
+        .subtitle { color: #aaa; font-size: 13px; margin-bottom: 20px; }
+        
+        .download-trigger-btn {
+            background: #00ff99;
+            color: #111;
+            border: none;
+            padding: 12px 24px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background 0.2s, transform 0.1s;
+            font-size: 15px;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 300px;
+            display: inline-block;
+        }
+        .download-trigger-btn:hover:not(:disabled) { background: #00cc7a; transform: scale(1.02); }
+        .download-trigger-btn:disabled { background: #555; color: #aaa; cursor: not-allowed; box-shadow: none; }
+
+        .controls {
+            background: #2e3238;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin: 0 auto 20px auto;
+            max-width: 1000px;
+            text-align: left;
+        }
+        .control-group { 
+            display: inline-block;
+            vertical-align: top;
+            width: 23%;
+            margin-right: 2%;
+            margin-bottom: 10px;
+        }
+        .control-group:last-child { margin-right: 0; }
+        label { margin-bottom: 5px; font-weight: bold; font-size: 13px; display: block; }
+        .status-badge { font-size: 11px; color: #ff4444; float: right; }
+        .status-badge.ready { color: #00ff99; }
+        
+        input, select {
+            background: #40444b;
+            border: 1px solid #555;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+        }
+        input[type="file"] { padding: 5px; }
+        
+        .viewer-container { margin: 0 auto; max-width: 1000px; text-align: left; }
+        
+        .canvas-box {
+            background: #1e1e1e;
+            border: 2px dashed #00ff99;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            display: inline-block;
+            vertical-align: top;
+            width: 65%;
+            min-height: 350px;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        canvas { 
+            background-image: linear-gradient(45deg, #333 25%, transparent 25%), linear-gradient(-45deg, #333 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #333 75%), linear-gradient(-45deg, transparent 75%, #333 75%); 
+            background-size: 20px 20px; 
+            max-width: 100%;
+            height: auto;
+            max-height: 400px;
+            display: block;
+        }
+
+        .mobile-touch-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+            -webkit-touch-callout: default !important;
+        }
+        
+        .info-box {
+            background: #2e3238;
+            padding: 15px;
+            border-radius: 8px;
+            display: inline-block;
+            vertical-align: top;
+            width: 32%;
+            margin-left: 3%;
+            min-height: 350px;
+            box-sizing: border-box;
+        }
+        .info-box h3 { margin-top: 0; color: #00ff99; border-bottom: 1px solid #444; padding-bottom: 8px; font-size: 16px; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        li { padding: 8px 0; border-bottom: 1px solid #444; font-size: 13px; text-align: left; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #2e3238;
+            padding: 25px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            border: 1px solid #444;
+            margin: auto;
+        }
+        .modal h2 { color: #00ff99; margin-top: 0; margin-bottom: 10px; font-size: 18px; }
+        .modal p { color: #ccc; font-size: 13px; margin-bottom: 20px; line-height: 1.4; }
+        .modal-buttons { display: block; }
+        .modal-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background: #00ff99; color: #111; }
+        .btn-secondary { background: #4f545c; color: white; }
+        .btn-close { background: transparent; color: #aaa; text-decoration: underline; font-size: 12px; border:none; margin-top: 5px;}
+
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            h1 { font-size: 20px; }
+            .control-group { display: block; width: 100%; margin-right: 0; margin-bottom: 12px; }
+            .control-group:last-child { margin-bottom: 0; }
+            .canvas-box { display: block; width: 100%; min-height: auto; margin-bottom: 15px; }
+            .info-box { display: block; width: 100%; margin-left: 0; min-height: auto; }
+            .download-trigger-btn { width: 100%; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>FNF Spritesheet Player</h1>
+    <div class="subtitle">Especial para la comunidad de Funky Maker Mobile</div>
+
+    <button class="download-trigger-btn" id="downloadTrigger" disabled>Descargar</button>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>1. Imagen (.png) <span id="imgStatus" class="status-badge">Falta</span></label>
+            <input type="file" id="imageInput" accept="image/png">
+        </div>
+        <div class="control-group">
+            <label>2. Archivo (.xml) <span id="xmlStatus" class="status-badge">Falta</span></label>
+            <input type="file" id="xmlInput" accept=".xml">
+        </div>
+        <div class="control-group">
+            <label>Animación</label>
+            <select id="animSelect" disabled>
+                <option>Sube los archivos primero</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>FPS</label>
+            <input type="number" id="fpsInput" value="24" min="1" max="60">
+        </div>
+    </div>
+
+    <div class="viewer-container">
+        <div class="canvas-box">
+            <div class="canvas-wrapper">
+                <canvas id="canvas" width="400" height="400"></canvas>
+                <!-- Capa invisible para Long Press -->
+                <img id="mobileDownloadOverlay" class="mobile-touch-overlay" alt="Mantén presionado para guardar">
+            </div>
+        </div>
+        <div class="info-box">
+            <h3>Datos del Frame</h3>
+            <ul id="frameInfo">
+                <li>Sube archivos para ver la información.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2>Opciones de Descarga</h2>
+            <p>Selecciona el formato de exportación en línea recta para Funky Maker Mobile.</p>
+            <div class="modal-buttons">
+                <button class="modal-btn btn-primary" id="btnDownloadCurrent">Descargar este (png)</button>
+                <button class="modal-btn btn-secondary" id="btnDownloadAll">Descargar todos (zip)</button>
+                <button class="modal-btn btn-close" id="btnCloseModal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const xmlInput = document.getElementById('xmlInput');
+        const animSelect = document.getElementById('animSelect');
+        const fpsInput = document.getElementById('fpsInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const hiddenCanvas = document.getElementById('hiddenCanvas');
+        const hCtx = hiddenCanvas.getContext('2d');
+        const frameInfo = document.getElementById('frameInfo');
+        const mobileDownloadOverlay = document.getElementById('mobileDownloadOverlay');
+
+        const imgStatus = document.getElementById('imgStatus');
+        const xmlStatus = document.getElementById('xmlStatus');
+
+        const downloadTrigger = document.getElementById('downloadTrigger');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const btnDownloadCurrent = document.getElementById('btnDownloadCurrent');
+        const btnDownloadAll = document.getElementById('btnDownloadAll');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+
+        let spritesheet = new Image();
+        let animations = {}; 
+        let currentAnimName = '';
+        let currentFrameIndex = 0;
+        let lastFrameTime = 0;
+        let animationId = null;
+        let xmlReady = false;
+        let imgReady = false;
+
+        imageInput.addEventListener('input', handleImage);
+        imageInput.addEventListener('change', handleImage);
+
+        function handleImage() {
+            const file = imageInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                spritesheet.src = event.target.result;
+                spritesheet.onload = () => {
+                    imgReady = true;
+                    imgStatus.textContent = "¡Listo!";
+                    imgStatus.className = "status-badge ready";
+                    checkAndStart();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        xmlInput.addEventListener('input', handleXML);
+        xmlInput.addEventListener('change', handleXML);
+
+        function handleXML() {
+            const file = xmlInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                parseXML(event.target.result);
+                xmlReady = true;
+                xmlStatus.textContent = "¡Listo!";
+                xmlStatus.className = "status-badge ready";
+                checkAndStart();
+            };
+            reader.readAsText(file);
+        }
+
+        function parseXML(xmlText) {
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const subTextures = xmlDoc.getElementsByTagName('SubTexture');
+            
+            animations = {}; 
+
+            for (let i = 0; i < subTextures.length; i++) {
+                const texture = subTextures[i];
+                const rawName = texture.getAttribute('name');
+                if (!rawName) continue;
+
+                const animName = rawName.replace(/\d+$/, '').trim();
+
+                const frameData = {
+                    x: parseInt(texture.getAttribute('x')),
+                    y: parseInt(texture.getAttribute('y')),
+                    width: parseInt(texture.getAttribute('width')),
+                    height: parseInt(texture.getAttribute('height')),
+                    frameX: parseInt(texture.getAttribute('frameX') || 0),
+                    frameY: parseInt(texture.getAttribute('frameY') || 0),
+                    frameWidth: parseInt(texture.getAttribute('frameWidth') || texture.getAttribute('width')),
+                    frameHeight: parseInt(texture.getAttribute('frameHeight') || texture.getAttribute('height'))
+                };
+
+                if (!animations[animName]) {
+                    animations[animName] = [];
+                }
+                animations[animName].push(frameData);
+            }
+
+            animSelect.innerHTML = '';
+            Object.keys(animations).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                animSelect.appendChild(option);
+            });
+            
+            if (Object.keys(animations).length > 0) {
+                animSelect.disabled = false;
+                currentAnimName = animSelect.value;
+            }
+        }
+
+        function checkAndStart() {
+            if (imgReady && xmlReady) {
+                currentFrameIndex = 0;
+                lastFrameTime = performance.now();
+                downloadTrigger.disabled = false;
+                
+                if (animationId) cancelAnimationFrame(animationId);
+                animationId = requestAnimationFrame(updateAnimation);
+                
+                setTimeout(updateMobileOverlayImage, 100);
+            }
+        }
+
+        animSelect.addEventListener('change', (e) => {
+            currentAnimName = e.target.value;
+            currentFrameIndex = 0;
+            setTimeout(updateMobileOverlayImage, 50);
+        });
+
+        function updateAnimation(timestamp) {
+            if (!currentAnimName || !animations[currentAnimName]) return;
+
+            const fps = parseInt(fpsInput.value) || 24;
+            const interval = 1000 / fps;
+            const elapsed = timestamp - lastFrameTime;
+
+            if (elapsed > interval) {
+                currentFrameIndex = (currentFrameIndex + 1) % animations[currentAnimName].length;
+                lastFrameTime = timestamp - (elapsed % interval);
+                drawFrame();
+            }
+
+            animationId = requestAnimationFrame(updateAnimation);
+        }
+
+        function drawFrame() {
+            const frame = animations[currentAnimName][currentFrameIndex];
+            if (!frame) return;
+
+            canvas.width = frame.frameWidth;
+            canvas.height = frame.frameHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const posX = Math.abs(frame.frameX);
+            const posY = Math.abs(frame.frameY);
+
+            ctx.drawImage(
+                spritesheet,
+                frame.x, frame.y, frame.width, frame.height,
+                posX, posY, frame.width, frame.height
+            );
+
+            frameInfo.innerHTML = `
+                <li><strong>Animación:</strong> ${currentAnimName}</li>
+                <li><strong>Frame:</strong> ${currentFrameIndex + 1} / ${animations[currentAnimName].length}</li>
+                <li><strong>Medidas Cuadro:</strong> ${frame.width}x${frame.height}</li>
+                <li><strong>Offsets:</strong> ${frame.frameX}, ${frame.frameY}</li>
+                <li><strong>Total Frames:</strong> ${animations[currentAnimName].length}</li>
+            `;
+        }
+
+        // --- SISTEMA ANTIBUG PARA IMÁGENES GIGANTES ---
+        function generateLinearSpritesheetBase64(animTargetName) {
+            const frames = animations[animTargetName];
+            if (!frames || frames.length === 0) return null;
+
+            let maxFrameWidth = 0;
+            let maxFrameHeight = 0;
+            frames.forEach(f => {
+                if (f.frameWidth > maxFrameWidth) maxFrameWidth = f.frameWidth;
+                if (f.frameHeight > maxFrameHeight) maxFrameHeight = f.frameHeight;
+            });
+
+            let totalWidth = maxFrameWidth * frames.length;
+            let scale = 1;
+
+            // Si supera el límite de los navegadores móviles, reduce a escala estable (50%)
+            if (totalWidth > 16000) {
+                scale = 0.5;
+                maxFrameWidth = Math.floor(maxFrameWidth * scale);
+                maxFrameHeight = Math.floor(maxFrameHeight * scale);
+                totalWidth = maxFrameWidth * frames.length;
+            }
+
+            hiddenCanvas.width = totalWidth;
+            hiddenCanvas.height = maxFrameHeight;
+            hCtx.clearRect(0, 0, hiddenCanvas.width, hiddenCanvas.height);
+
+            for (let i = 0; i < frames.length; i++) {
+                const frame = frames[i];
+                
+                // Aplicar escala matemática anti-error de renderizado
+                const offsetX = Math.abs(Math.floor(frame.frameX * scale));
+                const offsetY = Math.abs(Math.floor(frame.frameY * scale));
+                const targetX = (i * maxFrameWidth) + offsetX;
+                const targetW = Math.floor(frame.width * scale);
+                const targetH = Math.floor(frame.height * scale);
+
+                hCtx.drawImage(
+                    spritesheet,
+                    frame.x, frame.y, frame.width, frame.height,
+                    targetX, offsetY, targetW, targetH
+                );
+            }
+
+            return hiddenCanvas.toDataURL('image/png');
+        }
+
+        function updateMobileOverlayImage() {
+            if (!currentAnimName) return;
+            const dataUrl = generateLinearSpritesheetBase64(currentAnimName);
+            if (dataUrl) {
+                mobileDownloadOverlay.src = dataUrl;
+            }
+        }
+
+        downloadTrigger.addEventListener('click', () => modalOverlay.classList.add('active'));
+        btnCloseModal.addEventListener('click', () => modalOverlay.classList.remove('active'));
+
+        btnDownloadCurrent.addEventListener('click', () => {
+            if (!currentAnimName) return;
+            const dataUrl = generateLinearSpritesheetBase64(currentAnimName);
+            if (dataUrl) {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = `${currentAnimName}.png`;
+                link.click();
+            }
+            modalOverlay.classList.remove('active');
+        });
+
+        btnDownloadAll.addEventListener('click', async () => {
+            if (Object.keys(animations).length === 0) return;
+            btnDownloadAll.textContent = "Comprimiendo...";
+            try {
+                const zip = new JSZip();
+                for (const animName in animations) {
+                    const dataUrl = generateLinearSpritesheetBase64(animName);
+                    if (dataUrl) {
+                        const base64Data = dataUrl.split(',')[1];
+                        zip.file(`${animName}.png`, base64Data, {base64: true});
+                    }
+                }
+                const content = await zip.generateAsync({type: "blob"});
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(content);
+                link.download = `spritesheets_lineales_funky_maker.zip`;
+                link.click();
+            } catch (err) {
+                alert("Error creando ZIP: " + err.message);
+            }
+            btnDownloadAll.textContent = "Descargar todos (zip)";
+            modalOverlay.classList.remove('active');
+        });
+    </script>
+</body>
+</html>
